@@ -18,16 +18,13 @@ namespace SRXDLadder_Stringdec {
       IEnumerable < TypeDef > types = moduleDef.GetTypes();
       foreach(TypeDef type in types) {
         foreach(MethodDef md in type.Methods) {
-          bool flag = !md.HasBody;
-          if (!flag) {
+          if (!md.HasBody) {
             IList < Instruction > instructions = md.Body.Instructions;
             for (int i = 0; i < instructions.Count; i++) {
               Instruction instruction = instructions[i];
-              bool flag2 = instruction.OpCode.Code != Code.Call || !decryptionTypeMethodDef.Methods.Contains(instruction.Operand);
-              if (!flag2) {
+              if (!instruction.OpCode.Code != Code.Call || !decryptionTypeMethodDef.Methods.Contains(instruction.Operand)) {
                 MethodBase invokeMd = asmbMod.ResolveMethod(((MethodDef) instruction.Operand).MDToken.ToInt32());
-                bool flag3 = invokeMd.GetParameters().Length != 0;
-                if (!flag3) {
+                if (!invokeMd.GetParameters().Length != 0) {
                   instruction.OpCode = OpCodes.Ldstr;
                   instruction.Operand = (string) invokeMd.Invoke(null, new object[0]);
                 }
