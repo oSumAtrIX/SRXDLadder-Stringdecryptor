@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "SRXDLadder StringDecryptor": {
+      "commandName": "Project",
+      "commandLineArgs": "SRXDLadder.dll"
+    }
+  }
+}

@@ -1,39 +1,56 @@
+﻿using AsmResolver.DotNet;
+using AsmResolver.PE.DotNet.Cil;
+using AsmResolver.PE.DotNet.Metadata.Tables;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.CompilerServices;
-using dnlib.DotNet;
-using dnlib.DotNet.Emit;
 
-namespace SRXDLadder_Stringdec {
-  internal class Program {
-    private static void Main(string[] args) {
-      string dll = args[0];
-      Assembly reflectedAssembly = Assembly.UnsafeLoadFrom(dll);
-      ModuleDefMD moduleDef = ModuleDefMD.Load(dll, null);
-      Module asmbMod = reflectedAssembly.Modules.First < Module > ();
-      int decryptionTypeMDToken = reflectedAssembly.GetTypes().FirstOrDefault(x =>x.Namespace.Contains("PrivateImpl")).MetadataToken;
-      TypeDef decryptionTypeMethodDef = moduleDef.ResolveTypeDef(MDToken.ToRID(decryptionTypeMDToken));
-      IEnumerable < TypeDef > types = moduleDef.GetTypes();
-      foreach(TypeDef type in types) {
-        foreach(MethodDef md in type.Methods) {
-          if (!md.HasBody) {
-            IList < Instruction > instructions = md.Body.Instructions;
-            for (int i = 0; i < instructions.Count; i++) {
-              Instruction instruction = instructions[i];
-              if (!instruction.OpCode.Code != Code.Call || !decryptionTypeMethodDef.Methods.Contains(instruction.Operand)) {
-                MethodBase invokeMd = asmbMod.ResolveMethod(((MethodDef) instruction.Operand).MDToken.ToInt32());
-                if (!invokeMd.GetParameters().Length != 0) {
-                  instruction.OpCode = OpCodes.Ldstr;
-                  instruction.Operand = (string) invokeMd.Invoke(null, new object[0]);
+namespace SRXDLadder_Stringdec
+{
+    internal class Program
+    {
+        private static void Main(string[] args)
+        {
+            string file = args[0];
+
+            Module reflectedModule = Assembly.LoadFrom(file).Modules.First();
+            ModuleDefinition moduleDefinition = ModuleDefinition.FromFile(file);
+
+            IEnumerable<TypeDefinition> types = moduleDefinition.GetAllTypes();
+
+            int decryptorTypeToken = types.First(type => type.FullName.Contains("PrivateImplementation")).MetadataToken.ToInt32();
+
+            foreach (TypeDefinition type in types)
+            {
+                foreach (MethodDefinition method in type.Methods)
+                {
+                    if (method.CilMethodBody == null)
+                    {
+                        continue;
+                    }
+
+                    foreach (CilInstruction instruction in method.CilMethodBody.Instructions)
+                    {
+                        if (instruction.OpCode.Code != CilCode.Call || instruction.Operand is not MethodDefinition methodDefinition || methodDefinition.Parameters.Count != 0)
+                        {
+                            continue;
+                        }
+
+                        int methodToken = methodDefinition.DeclaringType.MetadataToken.ToInt32();
+                        
+                        if (methodToken != decryptorTypeToken)
+                        {
+                            continue;
+                        }
+
+                        MethodBase reflectedMethod = reflectedModule.ResolveMethod(methodDefinition.MetadataToken.ToInt32());
+                        instruction.OpCode = CilOpCodes.Ldstr;
+                        Console.WriteLine(instruction.Operand = reflectedMethod.Invoke(null, Array.Empty<object>()));
+                    }
                 }
-              }
             }
-          }
+            moduleDefinition.Write("SRXDLadder-decrypted.dll");
         }
-      }
-      moduleDef.Write("SRXDLadder-stringdec.dll");
     }
-  }
 }
